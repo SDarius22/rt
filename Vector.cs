@@ -88,7 +88,28 @@ namespace rt
 
         public void Rotate(Quaternion q)
         {
-            // TODO: ADD CODE HERE
+            // Normalize quaternion (without mutating the original)
+            double qw = q.W, qx = q.X, qy = q.Y, qz = q.Z;
+            double n = Math.Sqrt(qw * qw + qx * qx + qy * qy + qz * qz);
+            if (n < 1e-15) return; // degenerate quaternion, no-op
+
+            double inv = 1.0 / n;
+            qw *= inv; qx *= inv; qy *= inv; qz *= inv;
+
+            // t = 2 * (q.xyz × v)
+            double tx = 2.0 * (qy * Z - qz * Y);
+            double ty = 2.0 * (qz * X - qx * Z);
+            double tz = 2.0 * (qx * Y - qy * X);
+
+            // v' = v + q.w * t + (q.xyz × t)
+            double cx = qy * tz - qz * ty;
+            double cy = qz * tx - qx * tz;
+            double cz = qx * ty - qy * tx;
+
+            X += qw * tx + cx;
+            Y += qw * ty + cy;
+            Z += qw * tz + cz;
         }
+
     }
 }

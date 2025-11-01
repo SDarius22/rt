@@ -65,8 +65,9 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
 
             for (var j = 0; j < height; j++)
             {
-                var pointOnViewPlane = camera.Position + camera.Direction * camera.ViewPlaneDistance + 
-                                       (camera.Up ^ camera.Direction) * ImageToViewPlane(i, width, camera.ViewPlaneWidth) + 
+                var directionVector = camera.Direction;
+                var pointOnViewPlane = camera.Position + directionVector * camera.ViewPlaneDistance + 
+                                       (camera.Up ^ directionVector) * ImageToViewPlane(i, width, camera.ViewPlaneWidth) + 
                                        camera.Up * ImageToViewPlane(j, height, camera.ViewPlaneHeight);
                 var ray = new Line(camera.Position, pointOnViewPlane);
 
