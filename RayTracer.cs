@@ -65,26 +65,16 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
 
             for (var j = 0; j < height; j++)
             {
-                var viewDirection = camera.Direction * camera.ViewPlaneDistance;
-                var viewParallel = (camera.Direction ^ camera.Up).Normalize();
-                var viewPlaneX = ImageToViewPlane(i, width, camera.ViewPlaneWidth);
-                var viewPlaneY = ImageToViewPlane(j, height, camera.ViewPlaneHeight);
-
-                // Calculate the ray vector from the camera position to the current pixel on the view plane
-                var rayVector = camera.Position // 1. Starting from the camera position
-                                + viewDirection // 2. Adding the direction in which the camera is looking
-                                + viewParallel *
-                                viewPlaneX // 3. Moving along the horizontal axis of the view plane based on the current pixel's position
-                                + camera.Up *
-                                viewPlaneY; // 4. Moving along the vertical axis of the view plane base d on the current pixel's position
-
-                var ray = new Line(camera.Position, rayVector); // Create a Line representing the ray
+                var pointOnViewPlane = camera.Position + camera.Direction * camera.ViewPlaneDistance + 
+                                       (camera.Up ^ camera.Direction) * ImageToViewPlane(i, width, camera.ViewPlaneWidth) + 
+                                       camera.Up * ImageToViewPlane(j, height, camera.ViewPlaneHeight);
+                var ray = new Line(camera.Position, pointOnViewPlane);
 
                 // Find the first intersection of the ray with scene geometries
                 var intersection = FindFirstIntersection(ray, camera.FrontPlaneDistance, camera.BackPlaneDistance);
 
-                // If no visible intersection is found, set the pixel color to the background color
-                if (intersection.Visible)
+                // If a visible intersection is found, calculate set the pixel color in the rendered image
+                if (intersection.Valid && intersection.Visible)
                 {
                     // Extract material and surface properties from the intersection
                     // These values are used to calculate the pixel color
@@ -122,12 +112,12 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
                         pixelColor += ambientComponent;
                     }
 
-                    // Set the pixel color in the rendered image
+                    
                     image.SetPixel(i, j, pixelColor);
                     continue;
                 }
-
-
+                
+                // If no visible intersection is found, set the normal background color
                 image.SetPixel(i, j, background);
             }
         }
