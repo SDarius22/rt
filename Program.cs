@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace rt
@@ -56,7 +57,6 @@ namespace rt
                 new Light(new Vector( 65.0, -35.0, 165.0), new Color(0.8, 0.8, 0.8, 1.0), new Color(0.8, 0.8, 0.8, 1.0), new Color(0.8, 0.8, 0.8, 1.0), 1.0),
                 new Light(new Vector( 65.0,  40.0, 165.0), new Color(0.8, 0.8, 0.8, 1.0), new Color(0.8, 0.8, 0.8, 1.0), new Color(0.8, 0.8, 0.8, 1.0), 1.0)
             };
-            var rt = new RayTracer(geometries, lights);
 
             const int width = 800;
             const int height = 600;
@@ -77,6 +77,7 @@ namespace rt
                 {
                     var k = ind[0];
                     var a = (step * k) * Math.PI / 180.0;
+                    var ellipsoidRotation = Quaternion.FromAxisAngle(a, new Vector(1, 1, 1).Normalize());
                     var ca =  Math.Cos(a);
                     var sa =  Math.Sin(a);
             
@@ -93,8 +94,10 @@ namespace rt
                         1000.0
                     );
             
+                    var rotatedGeometries = geometries.Select(g => g is not Ellipsoid e ? g : new Ellipsoid(e) {Rotation = ellipsoidRotation}).ToArray();
                     var filename = frames+"/" + $"{k + 1:000}" + ".png";
             
+                    var rt = new RayTracer(rotatedGeometries, lights);
                     rt.Render(camera, width, height, filename);
                     Console.WriteLine($"Frame {k+1}/{n} completed");
                 });

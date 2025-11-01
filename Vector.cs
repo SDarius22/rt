@@ -85,5 +85,10 @@ namespace rt
             }
             return this;
         }
+
+        public void Rotate(Quaternion q)
+        {
+            // TODO: ADD CODE HERE
+        }
     }
 }

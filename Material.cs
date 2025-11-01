@@ -24,6 +24,10 @@
             Shininess = shininess;
         }
 
+        public Material(Material m) : this(m.Ambient, m.Diffuse, m.Specular, m.Shininess)
+        {
+        }
+        
         public static Material FromColor(Color color)
         {
             return new Material(color*0.1, color*0.3, color*0.5, 100);
