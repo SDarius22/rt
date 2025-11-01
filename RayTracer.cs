@@ -63,38 +63,48 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
                 var stepY = u * (vpH / height) * -1;
 
                 var p = topLeft + stepX * (i + 0.5) + stepY * (j + 0.5);
-                var dir = (p - origin).Normalize();
+                var viewDir = (p - origin).Normalize();
 
-                var ray = new Line(origin, origin + dir);
+                // FIX: use direction, not endpoint
+                var ray = new Line(origin, viewDir);
 
                 var hit = FindFirstIntersection(ray, camera.FrontPlaneDistance, camera.BackPlaneDistance);
 
                 if (hit.Valid && hit.Visible)
                 {
-                    var color = new Color();
                     var material = hit.Material;
+                    var N = hit.Normal.Normalize();
+                    var V = (viewDir * -1).Normalize();
+                    var outColor = new Color();
 
                     foreach (var light in lights)
                     {
-                        color += hit.Color * material.Ambient * light.Ambient;
+                        // Ambient
+                        outColor += hit.Color * material.Ambient * light.Ambient;
 
-                        if (IsLit(hit.Position, light))
+                        // Shadow test with small bias
+                        var shadedPoint = hit.Position + N * 0.001;
+                        if (IsLit(shadedPoint, light))
                         {
                             var L = (light.Position - hit.Position).Normalize();
-                            var N = hit.Normal.Normalize();
+                            var ndotl = Math.Max(0.0, N * L);
 
-                            var ndotl = N * L;
-                            if (ndotl > 0)
-                                color += hit.Color * material.Diffuse * light.Diffuse * ndotl;
+                            // Diffuse
+                            if (ndotl > 0.0)
+                                outColor += hit.Color * material.Diffuse * light.Diffuse * ndotl;
 
-                            var R = (N * (2 * ndotl) - L).Normalize();
-                            var Vdot = R * (dir * -1);
-                            if (Vdot > 0)
-                                color += material.Specular * light.Specular * Math.Pow(Vdot, material.Shininess);
+                            // Blinn-Phong specular
+                            if (ndotl > 0.0)
+                            {
+                                var H = (L + V).Normalize();
+                                var ndoth = Math.Max(0.0, N * H);
+                                if (ndoth > 0.0)
+                                    outColor += material.Specular * light.Specular * Math.Pow(ndoth, material.Shininess);
+                            }
                         }
                     }
 
-                    image.SetPixel(i, j, color);
+                    image.SetPixel(i, j, outColor);
                     continue;
                 }
 
