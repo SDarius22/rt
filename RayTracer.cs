@@ -29,11 +29,28 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
 
     private bool IsLit(Vector point, Light light)
     {
-        var direction = (light.Position - point).Normalize();
-        var shadowRay = new Line(point, direction);
-        var distanceToLight = (light.Position - point).Length();
-        var intersection = FindFirstIntersection(shadowRay, 0.001, distanceToLight - 0.001);
-        return !intersection.Valid;
+        var incidentLine = new Line(point, light.Position);
+
+        // Define a small value for numerical stability
+        const double epsilon = 1e-10;
+
+        // Calculate the length of the line segment between the point and the light source
+        var segmentLength = (point - light.Position).Length();
+
+        // Check for intersections with scene geometries
+        foreach (var geometry in geometries)
+        {
+            // Skip RawCtMask geometry
+            if (geometry is CtScan) continue;
+
+            // Check for intersection along the incident line within a limited segment
+            var intersection = geometry.GetIntersection(incidentLine, epsilon, segmentLength);
+
+            // If an intersection is visible, the point is not lit
+            if (intersection.Visible) return false;
+        }
+
+        return true;
     }
 
     public void Render(Camera camera, int width, int height, string filename)
@@ -48,65 +65,68 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
 
             for (var j = 0; j < height; j++)
             {
-                var f = camera.Direction.Normalize();
-                var r = (f ^ camera.Up).Normalize();
-                var u = (r ^ f).Normalize();
+                var viewDirection = camera.Direction * camera.ViewPlaneDistance;
+                var viewParallel = (camera.Direction ^ camera.Up).Normalize();
+                var viewPlaneX = ImageToViewPlane(i, width, camera.ViewPlaneWidth);
+                var viewPlaneY = ImageToViewPlane(j, height, camera.ViewPlaneHeight);
 
-                var aspect = (double)width / height;
-                var vpH = camera.ViewPlaneHeight;
-                var vpW = camera.ViewPlaneWidth > 0 ? camera.ViewPlaneWidth : vpH * aspect;
+                // Calculate the ray vector from the camera position to the current pixel on the view plane
+                var rayVector = camera.Position // 1. Starting from the camera position
+                                + viewDirection // 2. Adding the direction in which the camera is looking
+                                + viewParallel *
+                                viewPlaneX // 3. Moving along the horizontal axis of the view plane based on the current pixel's position
+                                + camera.Up *
+                                viewPlaneY; // 4. Moving along the vertical axis of the view plane base d on the current pixel's position
 
-                var origin = camera.Position;
-                var center = origin + f * camera.ViewPlaneDistance;
-                var topLeft = center + u * (vpH * 0.5) - r * (vpW * 0.5);
-                var stepX = r * (vpW / width);
-                var stepY = u * (vpH / height) * -1;
+                var ray = new Line(camera.Position, rayVector); // Create a Line representing the ray
 
-                var p = topLeft + stepX * (i + 0.5) + stepY * (j + 0.5);
-                var viewDir = (p - origin).Normalize();
+                // Find the first intersection of the ray with scene geometries
+                var intersection = FindFirstIntersection(ray, camera.FrontPlaneDistance, camera.BackPlaneDistance);
 
-                // FIX: use direction, not endpoint
-                var ray = new Line(origin, viewDir);
-
-                var hit = FindFirstIntersection(ray, camera.FrontPlaneDistance, camera.BackPlaneDistance);
-
-                if (hit.Valid && hit.Visible)
+                // If no visible intersection is found, set the pixel color to the background color
+                if (intersection.Visible)
                 {
-                    var material = hit.Material;
-                    var N = hit.Normal.Normalize();
-                    var V = (viewDir * -1).Normalize();
-                    var outColor = new Color();
+                    // Extract material and surface properties from the intersection
+                    // These values are used to calculate the pixel color
+                    var material = intersection.Material;
+                    var pixelColor = new Color();
+                    var pointOnSurface = intersection.Position;
+                    var eyeVector = (camera.Position - pointOnSurface).Normalize();
+                    var surfaceNormal = intersection.Normal;
 
+                    // Iterate over each light source to calculate lighting contributions
                     foreach (var light in lights)
                     {
-                        // Ambient
-                        outColor += hit.Color * material.Ambient * light.Ambient;
+                        // Calculate ambient component
+                        var ambientComponent = material.Ambient * light.Ambient;
 
-                        // Shadow test with small bias
-                        var shadedPoint = hit.Position + N * 0.001;
-                        if (IsLit(shadedPoint, light))
+                        // Check if the point on the surface is lit by the current light source
+                        if (IsLit(pointOnSurface, light))
                         {
-                            var L = (light.Position - hit.Position).Normalize();
-                            var ndotl = Math.Max(0.0, N * L);
+                            var lightDirection = (light.Position - pointOnSurface).Normalize();
+                            var reflectionDirection =
+                                (surfaceNormal * (surfaceNormal * lightDirection) * 2 - lightDirection).Normalize();
 
-                            // Diffuse
-                            if (ndotl > 0.0)
-                                outColor += hit.Color * material.Diffuse * light.Diffuse * ndotl;
+                            var diffuseFactor = surfaceNormal * lightDirection;
+                            var specularFactor = eyeVector * reflectionDirection;
 
-                            // Blinn-Phong specular
-                            if (ndotl > 0.0)
-                            {
-                                var H = (L + V).Normalize();
-                                var ndoth = Math.Max(0.0, N * H);
-                                if (ndoth > 0.0)
-                                    outColor += material.Specular * light.Specular * Math.Pow(ndoth, material.Shininess);
-                            }
+                            if (diffuseFactor > 0)
+                                pixelColor += material.Diffuse * light.Diffuse * diffuseFactor;
+
+                            if (specularFactor > 0)
+                                pixelColor += material.Specular * light.Specular *
+                                              Math.Pow(specularFactor, material.Shininess);
                         }
+
+                        // Add ambient component to the pixel color
+                        pixelColor += ambientComponent;
                     }
 
-                    image.SetPixel(i, j, outColor);
+                    // Set the pixel color in the rendered image
+                    image.SetPixel(i, j, pixelColor);
                     continue;
                 }
+
 
                 image.SetPixel(i, j, background);
             }
