@@ -32,49 +32,67 @@ public class Ellipsoid : Geometry
 
     public override Intersection GetIntersection(Line line, double minDist, double maxDist)
     {
-        // Transform ray to ellipsoid's local coordinates
-        var origin = line.X0 - Center;
-        var direction = new Vector(line.Dx);
+        // Copy and normalize rotation
+        var rot = new Quaternion(Rotation.W, Rotation.X, Rotation.Y, Rotation.Z).Normalize();
+        var invRot = new Quaternion(rot.W, -rot.X, -rot.Y, -rot.Z); // conjugate (unit quaternion inverse)
 
-        // Scale the ray to transform the ellipsoid into a unit sphere
-        var scaledOrigin = new Vector(origin.X / SemiAxesLength.X, origin.Y / SemiAxesLength.Y,
-            origin.Z / SemiAxesLength.Z);
-        var scaledDirection = new Vector(direction.X / SemiAxesLength.X, direction.Y / SemiAxesLength.Y,
-            direction.Z / SemiAxesLength.Z);
+        // Translate ray to ellipsoid center
+        var localOrigin = new Vector(line.X0 - Center);
+        var localDirection = new Vector(line.Dx);
 
-        // Standard ray-sphere intersection (for a unit sphere at origin)
+        // Rotate ray into ellipsoid local frame
+        localOrigin.Rotate(invRot);
+        localDirection.Rotate(invRot);
+
+        // Scale to unit sphere space
+        var scaledOrigin = new Vector(
+            localOrigin.X / SemiAxesLength.X,
+            localOrigin.Y / SemiAxesLength.Y,
+            localOrigin.Z / SemiAxesLength.Z
+        );
+        var scaledDirection = new Vector(
+            localDirection.X / SemiAxesLength.X,
+            localDirection.Y / SemiAxesLength.Y,
+            localDirection.Z / SemiAxesLength.Z
+        );
+
+        // Ray-sphere intersection
         var a = scaledDirection.Length2();
-        var b = 2 * (scaledDirection * scaledOrigin);
+        var b = 2.0 * (scaledDirection * scaledOrigin);
         var c = scaledOrigin.Length2() - Radius * Radius;
 
-        var delta = b * b - 4 * a * c;
-
-        if (delta < 0) return Intersection.NONE;
+        var delta = b * b - 4.0 * a * c;
+        if (delta < 0.0) return Intersection.NONE;
 
         var sqrtDelta = Math.Sqrt(delta);
-        var t1 = (-b - sqrtDelta) / (2 * a);
-        var t2 = (-b + sqrtDelta) / (2 * a);
+        var t1 = (-b - sqrtDelta) / (2.0 * a);
+        var t2 = (-b + sqrtDelta) / (2.0 * a);
 
-        double t = -1;
-
-        if (t1 > minDist && t1 < maxDist)
-            t = t1;
+        double t = -1.0;
+        if (t1 > minDist && t1 < maxDist) t = t1;
         else if (t2 > minDist && t2 < maxDist) t = t2;
 
-        if (t < 0) return Intersection.NONE;
+        if (t < 0.0) return Intersection.NONE;
 
-        var localPosition = scaledOrigin + scaledDirection * t;
+        // Point in scaled (sphere) space
+        var spherePoint = scaledOrigin + scaledDirection * t;
 
-        var normal = new Vector(
-            2 * localPosition.X / (SemiAxesLength.X * SemiAxesLength.X),
-            2 * localPosition.Y / (SemiAxesLength.Y * SemiAxesLength.Y),
-            2 * localPosition.Z / (SemiAxesLength.Z * SemiAxesLength.Z)
-        );
-        normal.Normalize();
+        // Normal in unrotated ellipsoid space (keep original formula)
+        var normalLocal = new Vector(
+            2.0 * spherePoint.X / (SemiAxesLength.X * SemiAxesLength.X),
+            2.0 * spherePoint.Y / (SemiAxesLength.Y * SemiAxesLength.Y),
+            2.0 * spherePoint.Z / (SemiAxesLength.Z * SemiAxesLength.Z)
+        ).Normalize();
 
-        var outwardNormal = normal;
-        if (normal * line.Dx > 0) outwardNormal = normal * -1;
+        // Flip if inside
+        if (normalLocal * localDirection > 0.0)
+            normalLocal = normalLocal * -1.0;
 
-        return new Intersection(true, true, this, line, t, outwardNormal, Material, Color);
+        // Rotate normal back to world space
+        var worldNormal = new Vector(normalLocal);
+        worldNormal.Rotate(rot);
+        worldNormal.Normalize();
+
+        return new Intersection(true, true, this, line, t, worldNormal, Material, Color);
     }
 }
