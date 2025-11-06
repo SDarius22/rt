@@ -34,15 +34,13 @@ public class Ellipsoid : Geometry
     {
         // Copy and normalize rotation
         var rot = new Quaternion(Rotation.W, Rotation.X, Rotation.Y, Rotation.Z).Normalize();
-        var invRot = new Quaternion(rot.W, -rot.X, -rot.Y, -rot.Z); // conjugate (unit quaternion inverse)
-
         // Translate ray to ellipsoid center
         var localOrigin = new Vector(line.X0 - Center);
         var localDirection = new Vector(line.Dx);
 
         // Rotate ray into ellipsoid local frame
-        localOrigin.Rotate(invRot);
-        localDirection.Rotate(invRot);
+        localOrigin.Rotate(rot);
+        localDirection.Rotate(rot);
 
         // Scale to unit sphere space
         var scaledOrigin = new Vector(
@@ -86,7 +84,7 @@ public class Ellipsoid : Geometry
 
         // Flip if inside
         if (normalLocal * localDirection > 0.0)
-            normalLocal = normalLocal * -1.0;
+            normalLocal *= -1.0;
 
         // Rotate normal back to world space
         var worldNormal = new Vector(normalLocal);
