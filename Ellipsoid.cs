@@ -34,6 +34,7 @@ public class Ellipsoid : Geometry
     {
         // Copy and normalize rotation
         var rot = new Quaternion(Rotation.W, Rotation.X, Rotation.Y, Rotation.Z).Normalize();
+        
         // Translate ray to ellipsoid center
         var localOrigin = new Vector(line.X0 - Center);
         var localDirection = new Vector(line.Dx);

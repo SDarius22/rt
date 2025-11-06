@@ -65,11 +65,13 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
 
             for (var j = 0; j < height; j++)
             {
-                var directionVector = camera.Direction;
-                var pointOnViewPlane = camera.Position + directionVector * camera.ViewPlaneDistance + 
-                                       (camera.Up ^ directionVector) * ImageToViewPlane(i, width, camera.ViewPlaneWidth) + 
-                                       camera.Up * ImageToViewPlane(j, height, camera.ViewPlaneHeight);
-                var ray = new Line(camera.Position, pointOnViewPlane);
+                var position = camera.Position;
+                var direction = camera.Direction;
+                var up = camera.Up;
+                var pointOnViewPlane = position + direction * camera.ViewPlaneDistance + 
+                                       (up ^ direction) * ImageToViewPlane(i, width, camera.ViewPlaneWidth) + 
+                                       up * ImageToViewPlane(j, height, camera.ViewPlaneHeight);
+                var ray = new Line(position, pointOnViewPlane);
 
                 // Find the first intersection of the ray with scene geometries
                 var intersection = FindFirstIntersection(ray, camera.FrontPlaneDistance, camera.BackPlaneDistance);
@@ -82,7 +84,7 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
                     var material = intersection.Material;
                     var pixelColor = new Color();
                     var pointOnSurface = intersection.Position;
-                    var eyeVector = (camera.Position - pointOnSurface).Normalize();
+                    var eyeVector = (position - pointOnSurface).Normalize();
                     var surfaceNormal = intersection.Normal;
 
                     // Iterate over each light source to calculate lighting contributions
