@@ -34,6 +34,7 @@ public class Ellipsoid : Geometry
     {
         // Copy and normalize rotation
         var rot = new Quaternion(Rotation.W, Rotation.X, Rotation.Y, Rotation.Z).Normalize();
+        var invRot = new Quaternion(rot.W, -rot.X, -rot.Y, -rot.Z);
         
         // Translate ray to ellipsoid center
         var localOrigin = new Vector(line.X0 - Center);
@@ -89,7 +90,7 @@ public class Ellipsoid : Geometry
 
         // Rotate normal back to world space
         var worldNormal = new Vector(normalLocal);
-        worldNormal.Rotate(rot);
+        worldNormal.Rotate(invRot);
         worldNormal.Normalize();
 
         return new Intersection(true, true, this, line, t, worldNormal, Material, Color);
