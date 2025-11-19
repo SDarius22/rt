@@ -40,7 +40,7 @@ internal class RayTracer(Geometry[] geometries, Light[] lights)
         // Check for intersections with scene geometries
         foreach (var geometry in geometries)
         {
-            // Skip RawCtMask geometry
+            // Skip CtScan geometry
             if (geometry is CtScan) continue;
 
             // Check for intersection along the incident line within a limited segment
